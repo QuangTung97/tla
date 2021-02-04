@@ -76,7 +76,6 @@ Loop:
         changeset := <<>>;
 Processing:
         while Len(buffer) /= 0 do
-CheckValid:
             current := Head(buffer);
             buffer := Tail(buffer);
             
@@ -95,7 +94,7 @@ end process;
 
 end algorithm;
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "6550c00f" /\ chksum(tla) = "db41e6fc")
+\* BEGIN TRANSLATION (chksum(pcal) = "43918a73" /\ chksum(tla) = "6e5a8a55")
 VARIABLES cache, store, channel, sequence, buffer, current, tmp_sequence, 
           changeset, pc
 
@@ -179,22 +178,19 @@ Loop == /\ pc[1] = "Loop"
 
 Processing == /\ pc[1] = "Processing"
               /\ IF Len(buffer) /= 0
-                    THEN /\ pc' = [pc EXCEPT ![1] = "CheckValid"]
+                    THEN /\ current' = Head(buffer)
+                         /\ buffer' = Tail(buffer)
+                         /\ IF current'.snapshot >= tmp_sequence + 1 - sequence_range
+                               THEN /\ cache' = CachePut(current'.key, tmp_sequence + 1)
+                                    /\ changeset' = (current'.key :> tmp_sequence + 1) @@ changeset
+                                    /\ tmp_sequence' = tmp_sequence + 1
+                               ELSE /\ TRUE
+                                    /\ UNCHANGED << cache, tmp_sequence, 
+                                                    changeset >>
+                         /\ pc' = [pc EXCEPT ![1] = "Processing"]
                     ELSE /\ pc' = [pc EXCEPT ![1] = "StoreData"]
-              /\ UNCHANGED << cache, store, channel, sequence, buffer, current, 
-                              tmp_sequence, changeset, local_sequence, key, 
-                              value >>
-
-CheckValid == /\ pc[1] = "CheckValid"
-              /\ current' = Head(buffer)
-              /\ buffer' = Tail(buffer)
-              /\ IF current'.snapshot >= tmp_sequence + 1 - sequence_range
-                    THEN /\ cache' = CachePut(current'.key, tmp_sequence + 1)
-                         /\ changeset' = (current'.key :> tmp_sequence + 1) @@ changeset
-                         /\ tmp_sequence' = tmp_sequence + 1
-                    ELSE /\ TRUE
-                         /\ UNCHANGED << cache, tmp_sequence, changeset >>
-              /\ pc' = [pc EXCEPT ![1] = "Processing"]
+                         /\ UNCHANGED << cache, buffer, current, tmp_sequence, 
+                                         changeset >>
               /\ UNCHANGED << store, channel, sequence, local_sequence, key, 
                               value >>
 
@@ -212,7 +208,7 @@ SetSequence == /\ pc[1] = "SetSequence"
                                tmp_sequence, changeset, local_sequence, key, 
                                value >>
 
-main == Loop \/ Processing \/ CheckValid \/ StoreData \/ SetSequence
+main == Loop \/ Processing \/ StoreData \/ SetSequence
 
 Next == main
            \/ (\E self \in 2..5: sender(self))
@@ -224,5 +220,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Thu Feb 04 13:37:42 ICT 2021 by teko
+\* Last modified Thu Feb 04 14:02:44 ICT 2021 by teko
 \* Created Thu Feb 04 09:40:08 ICT 2021 by teko
